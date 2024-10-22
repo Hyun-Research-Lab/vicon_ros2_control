@@ -1,7 +1,7 @@
 <library path="vicon_hardware_interface">
   <class name="vicon_hardware_interface/ViconHardwareInterface"
          type="vicon_hardware_interface::ViconHardwareInterface"
-         base_class_type="hardware_interface::SystemInterface">
+         base_class_type="hardware_interface::SensorInterface">
     <description>
       Serial port communication with vicon.
     </description>

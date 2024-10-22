@@ -1,13 +1,15 @@
 #ifndef VICON_HARDWARE_INTERFACE_HPP_
 #define VICON_HARDWARE_INTERFACE_HPP_
 
-#include <hardware_interface/system_interface.hpp>
+#include <hardware_interface/sensor_interface.hpp>
 #include <hardware_interface/types/hardware_interface_type_values.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include "vicon_hardware_interface/vicon_tracking_object.hpp"
 
 namespace vicon_hardware_interface
 {
-    class ViconHardwareInterface : public hardware_interface::SystemInterface
+
+    class ViconHardwareInterface : public hardware_interface::SensorInterface
     {
     public:
         // Configure the hardware interface
@@ -25,13 +27,9 @@ namespace vicon_hardware_interface
         // Read data from hardware (e.g., mocap system)
         hardware_interface::return_type read(const rclcpp::Time &time, const rclcpp::Duration &period) override;
 
-        hardware_interface::return_type write(
-            const rclcpp::Time &time, const rclcpp::Duration &period) override;
-
     private:
-        // Variables to hold the mocap data
-        double position_x_, position_y_, position_z_;
-        double orientation_roll_, orientation_pitch_, orientation_yaw_;
+        std::map<std::string, ViconTrackingObject> viconObjects;
+        
     };
 } // namespace vicon_hardware_interface
 

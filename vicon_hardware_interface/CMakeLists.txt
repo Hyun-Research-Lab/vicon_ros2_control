@@ -12,6 +12,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   pluginlib
   rclcpp
   rclcpp_lifecycle
+  Eigen3
 )
 
 # Specify the required version of ros2_control
@@ -29,11 +30,14 @@ foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
   find_package(${Dependency} REQUIRED)
 endforeach()
 
+include_directories(${EIGEN3_INCLUDE_DIR})
+
 ##COMPILE
 add_library(
   vicon_hardware_interface
   SHARED
   src/vicon_hardware_interface.cpp
+  src/vicon_tracking_object.cpp
 )
 
 

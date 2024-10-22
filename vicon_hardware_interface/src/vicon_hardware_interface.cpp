@@ -6,18 +6,19 @@ namespace vicon_hardware_interface
 {
 hardware_interface::CallbackReturn ViconHardwareInterface::on_init(const hardware_interface::HardwareInfo & info)
 {
-  if (SystemInterface::on_init(info) != hardware_interface::CallbackReturn::SUCCESS)
+  if (SensorInterface::on_init(info) != hardware_interface::CallbackReturn::SUCCESS)
   {
     return hardware_interface::CallbackReturn::ERROR;
   }
 
-  // Initialize mocap data
-  position_x_ = 0.0;
-  position_y_ = 0.0;
-  position_z_ = 0.0;
-  orientation_roll_ = 0.0;
-  orientation_pitch_ = 0.0;
-  orientation_yaw_ = 0.0;
+  // info_.hardware_interface
+  std::string name = info_.sensors[0].name;
+  RCLCPP_INFO(get_logger(), "Our sensor name is %s", name.c_str());
+
+  // create all of the tracking objects
+  for (const auto& sensor : info_.sensors) {
+    viconObjects[sensor.name] = ViconTrackingObject();
+  }
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -26,15 +27,29 @@ std::vector<hardware_interface::StateInterface> ViconHardwareInterface::export_s
 {
   std::vector<hardware_interface::StateInterface> state_interfaces;
 
-  // Expose position state interfaces
-  state_interfaces.emplace_back("vicon_object", "position_x", &position_x_);
-  state_interfaces.emplace_back("vicon_object", "position_y", &position_y_);
-  state_interfaces.emplace_back("vicon_object", "position_z", &position_z_);
+  for (auto it = viconObjects.begin(); it != viconObjects.end(); ++it) {
+    std::string sensorName = it->first;
+    ViconTrackingObject obj = it->second;
+    const FullState &state = obj.GetOutputState();
 
-  // Expose orientation state interfaces
-  state_interfaces.emplace_back("vicon_object", "orientation_roll", &orientation_roll_);
-  state_interfaces.emplace_back("vicon_object", "orientation_pitch", &orientation_pitch_);
-  state_interfaces.emplace_back("vicon_object", "orientation_yaw", &orientation_yaw_);
+    state_interfaces.emplace_back(sensorName, "position_x", (double *)&(state.position_x));
+    state_interfaces.emplace_back(sensorName, "position_y", (double *)&(state.position_y));
+    state_interfaces.emplace_back(sensorName, "position_z", (double *)&(state.position_z));
+
+    state_interfaces.emplace_back(sensorName, "velocity_x", (double *)&(state.velocity_x));
+    state_interfaces.emplace_back(sensorName, "velocity_y", (double *)&(state.velocity_y));
+    state_interfaces.emplace_back(sensorName, "velocity_z", (double *)&(state.velocity_z));
+
+    state_interfaces.emplace_back(sensorName, "orientation_qx", (double *)&(state.orientation_qx));
+    state_interfaces.emplace_back(sensorName, "orientation_qy", (double *)&(state.orientation_qy));
+    state_interfaces.emplace_back(sensorName, "orientation_qz", (double *)&(state.orientation_qz));
+    state_interfaces.emplace_back(sensorName, "orientation_qw", (double *)&(state.orientation_qw));
+
+    state_interfaces.emplace_back(sensorName, "angular_velocity_qx_dot", (double *)&(state.angular_velocity_qx_dot));
+    state_interfaces.emplace_back(sensorName, "angular_velocity_qy_dot", (double *)&(state.angular_velocity_qy_dot));
+    state_interfaces.emplace_back(sensorName, "angular_velocity_qz_dot", (double *)&(state.angular_velocity_qz_dot));
+    state_interfaces.emplace_back(sensorName, "angular_velocity_qw_dot", (double *)&(state.angular_velocity_qw_dot));
+  }
 
   return state_interfaces;
 }
@@ -55,25 +70,13 @@ hardware_interface::return_type ViconHardwareInterface::read(const rclcpp::Time 
 {
   // Read mocap data and update the state variables
   // This is where you'd fetch data from the Vicon system
-  position_x_ = 1.0;
-  position_y_ = 2.0;
-  position_z_ = 3.0;
-  orientation_roll_ = 4.0;
-  orientation_pitch_ = 5.0;
-  orientation_yaw_ = 6.0;
 
   return hardware_interface::return_type::OK;
 }
 
-  hardware_interface::return_type ViconHardwareInterface::write(
-        const rclcpp::Time &, const rclcpp::Duration &)
-  {
-    // Since this is a read-only interface, return OK without any action.
-    return hardware_interface::return_type::OK;
-  }
 }  // namespace vicon_hardware_interface
 
 // register plugin
 #include "pluginlib/class_list_macros.hpp"
 PLUGINLIB_EXPORT_CLASS(
-	vicon_hardware_interface::ViconHardwareInterface, hardware_interface::SystemInterface)
+	vicon_hardware_interface::ViconHardwareInterface, hardware_interface::SensorInterface)
