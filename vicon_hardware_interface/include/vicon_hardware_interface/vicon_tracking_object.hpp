@@ -57,7 +57,6 @@ namespace vicon_hardware_interface
         std::array<FullState, VICON_BUFFER_LENGTH> statesRaw;
         std::array<FullState, VICON_BUFFER_LENGTH> statesFiltered;
         
-
         void _PushRaw(const FullState &fs);
         void _PushFiltered(const FullState &fs);
 
@@ -68,7 +67,6 @@ namespace vicon_hardware_interface
         const FullState & GetOutputState() const { return outputState; }
         void PushData(const HalfState &hs);
         FullState outputState;
-
     };
 } // namespace vicon_hardware_interface
 

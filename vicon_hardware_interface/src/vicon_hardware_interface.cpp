@@ -57,22 +57,28 @@ namespace vicon_hardware_interface
     //   state_interfaces.emplace_back("cf01", "omegab_3", (double *)&(viconObjects["cf01"].outputState.omegab_3));
     // }
 
-    state_interfaces.emplace_back("cf01", "position_x", (double *)&(viconObjects["cf01"].outputState.position_x));
-    state_interfaces.emplace_back("cf01", "position_y", (double *)&(viconObjects["cf01"].outputState.position_y));
-    state_interfaces.emplace_back("cf01", "position_z", (double *)&(viconObjects["cf01"].outputState.position_z));
+    for (auto it = viconObjects.begin(); it != viconObjects.end(); ++it) 
+    {
+      std::string sensorName = it->first;
+      state_interfaces.emplace_back(sensorName, "position_x", (double *)&(viconObjects[sensorName].outputState.position_x));
+      state_interfaces.emplace_back(sensorName, "position_y", (double *)&(viconObjects[sensorName].outputState.position_y));
+      state_interfaces.emplace_back(sensorName, "position_z", (double *)&(viconObjects[sensorName].outputState.position_z));
 
-    state_interfaces.emplace_back("cf01", "velocity_x", (double *)&(viconObjects["cf01"].outputState.velocity_x));
-    state_interfaces.emplace_back("cf01", "velocity_y", (double *)&(viconObjects["cf01"].outputState.velocity_y));
-    state_interfaces.emplace_back("cf01", "velocity_z", (double *)&(viconObjects["cf01"].outputState.velocity_z));
+      state_interfaces.emplace_back(sensorName, "velocity_x", (double *)&(viconObjects[sensorName].outputState.velocity_x));
+      state_interfaces.emplace_back(sensorName, "velocity_y", (double *)&(viconObjects[sensorName].outputState.velocity_y));
+      state_interfaces.emplace_back(sensorName, "velocity_z", (double *)&(viconObjects[sensorName].outputState.velocity_z));
 
-    state_interfaces.emplace_back("cf01", "orientation_qx", (double *)&(viconObjects["cf01"].outputState.orientation_qx));
-    state_interfaces.emplace_back("cf01", "orientation_qy", (double *)&(viconObjects["cf01"].outputState.orientation_qy));
-    state_interfaces.emplace_back("cf01", "orientation_qz", (double *)&(viconObjects["cf01"].outputState.orientation_qz));
-    state_interfaces.emplace_back("cf01", "orientation_qw", (double *)&(viconObjects["cf01"].outputState.orientation_qw));
+      state_interfaces.emplace_back(sensorName, "orientation_qx", (double *)&(viconObjects[sensorName].outputState.orientation_qx));
+      state_interfaces.emplace_back(sensorName, "orientation_qy", (double *)&(viconObjects[sensorName].outputState.orientation_qy));
+      state_interfaces.emplace_back(sensorName, "orientation_qz", (double *)&(viconObjects[sensorName].outputState.orientation_qz));
+      state_interfaces.emplace_back(sensorName, "orientation_qw", (double *)&(viconObjects[sensorName].outputState.orientation_qw));
 
-    state_interfaces.emplace_back("cf01", "omegab_1", (double *)&(viconObjects["cf01"].outputState.omegab_1));
-    state_interfaces.emplace_back("cf01", "omegab_2", (double *)&(viconObjects["cf01"].outputState.omegab_2));
-    state_interfaces.emplace_back("cf01", "omegab_3", (double *)&(viconObjects["cf01"].outputState.omegab_3));
+      state_interfaces.emplace_back(sensorName, "omegab_1", (double *)&(viconObjects[sensorName].outputState.omegab_1));
+      state_interfaces.emplace_back(sensorName, "omegab_2", (double *)&(viconObjects[sensorName].outputState.omegab_2));
+      state_interfaces.emplace_back(sensorName, "omegab_3", (double *)&(viconObjects[sensorName].outputState.omegab_3));
+    }
+
+    
 
     return state_interfaces;
   }
@@ -102,7 +108,9 @@ namespace vicon_hardware_interface
   {
     // Read mocap data and update the state variables
     // This is where you'd fetch data from the Vicon system
+    RCLCPP_INFO(this->get_logger(), "Reading data from Vicon system...");
     getFrame();
+    RCLCPP_INFO(this->get_logger(), "Data read successfully.");
     return hardware_interface::return_type::OK;
   }
 
