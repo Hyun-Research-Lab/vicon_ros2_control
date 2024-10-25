@@ -35,9 +35,11 @@ namespace vicon_hardware_interface
         Client viconClient;
 
         std::string hostname;
+        int updateRateHz;
 
-        bool connect(std::string hostname, int bufferSize);
+        bool connect(int bufferSize);
         bool disconnect();
+        bool getFrame();
         
     };
 } // namespace vicon_hardware_interface

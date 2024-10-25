@@ -1,5 +1,5 @@
 #include "vicon_hardware_interface/vicon_tracking_object.hpp"
-#include <stdexcept>   // std::runtime_error
+#include <stdexcept> // std::runtime_error
 
 namespace vicon_hardware_interface
 {
@@ -73,7 +73,7 @@ namespace vicon_hardware_interface
         Vector<3> y1, y2; // filtered
         FullStateToPositionVector(_GetFilteredData(0), y1);
         FullStateToPositionVector(_GetFilteredData(1), y2);
-        
+
         Vector<3> p;
         double a0 = 1 / 4.0;
         double a1 = 1 / 4.0;
@@ -83,6 +83,8 @@ namespace vicon_hardware_interface
         double b2 = 0.0;
         p = a0 * x0 + a1 * x1 + a2 * x2 + a3 * x3 + b1 * y1 + b2 * y2;
 
+        p = x0;
+
         // filtered quaternion vector
         Vector<4> q;
         FullStateToQuaternionVector(fs_raw, q);
@@ -90,25 +92,35 @@ namespace vicon_hardware_interface
         FullStateToQuaternionVector(_GetFilteredData(0), q1);
         FullStateToQuaternionVector(_GetFilteredData(1), q2);
 
-        
-        
         // normalize the quaternion when we are done
-        q *= 1.0/q.norm();
+        q /= q.norm();
 
         // calculate the linear velocity using a simple finite difference
         double dt = fs_raw.time - _GetRawData(0).time;
         Vector<3> v;
-        v[0] = (p[0] - y1[0]) / dt;
-        v[1] = (p[1] - y1[1]) / dt;
-        v[2] = (p[2] - y1[2]) / dt;
+
+        if (dt > 0)
+        {
+            v[0] = (p[0] - y1[0]) / dt;
+            v[1] = (p[1] - y1[1]) / dt;
+            v[2] = (p[2] - y1[2]) / dt;
+        }
+        else
+        {
+            v[0] = 0;
+            v[1] = 0;
+            v[2] = 0;
+        }
 
         // do quaternion derivative (this approximation is not the best, but works for small time steps)
         Vector<3> omegab;
+        omegab[0] = 0;
+        omegab[1] = 0;
+        omegab[2] = 0;
         // q_dot[0] = (p[3] - y1[3]) / dt;
         // q_dot[1] = (p[4] - y1[4]) / dt;
         // q_dot[2] = (p[5] - y1[5]) / dt;
         // q_dot[3] = (p[6] - y1[6]) / dt;
-
 
         // push to raw and filtered data arrays
         FullState fs_filtered;
@@ -119,10 +131,10 @@ namespace vicon_hardware_interface
         fs_filtered.velocity_x = v[0];
         fs_filtered.velocity_y = v[1];
         fs_filtered.velocity_z = v[2];
-        fs_filtered.orientation_qx = p[3];
-        fs_filtered.orientation_qy = p[4];
-        fs_filtered.orientation_qz = p[5];
-        fs_filtered.orientation_qw = p[6];
+        fs_filtered.orientation_qx = q[0];
+        fs_filtered.orientation_qy = q[1];
+        fs_filtered.orientation_qz = q[2];
+        fs_filtered.orientation_qw = q[3];
         fs_filtered.omegab_1 = omegab[0];
         fs_filtered.omegab_2 = omegab[1];
         fs_filtered.omegab_3 = omegab[2];
@@ -186,6 +198,5 @@ namespace vicon_hardware_interface
 
         return statesFiltered[index];
     }
-
 
 }

@@ -3,6 +3,7 @@
 
 #include <array>
 #include <Eigen/Dense> // eigen library
+#include <iostream>
 
 namespace vicon_hardware_interface
 {
@@ -50,12 +51,12 @@ namespace vicon_hardware_interface
     private:
         static constexpr size_t VICON_BUFFER_LENGTH = 5;
 
-        size_t latestRawIndex;
-        size_t latestFilteredIndex;
+        size_t latestRawIndex=0;
+        size_t latestFilteredIndex=0;
         bool buffersInitialized = false;
         std::array<FullState, VICON_BUFFER_LENGTH> statesRaw;
         std::array<FullState, VICON_BUFFER_LENGTH> statesFiltered;
-        FullState outputState;
+        
 
         void _PushRaw(const FullState &fs);
         void _PushFiltered(const FullState &fs);
@@ -66,6 +67,7 @@ namespace vicon_hardware_interface
     public:
         const FullState & GetOutputState() const { return outputState; }
         void PushData(const HalfState &hs);
+        FullState outputState;
 
     };
 } // namespace vicon_hardware_interface
