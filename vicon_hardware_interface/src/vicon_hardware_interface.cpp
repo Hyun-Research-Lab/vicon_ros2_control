@@ -15,17 +15,76 @@ namespace vicon_hardware_interface
     std::string name = info_.sensors[0].name;
     RCLCPP_INFO(get_logger(), "Our sensor name is %s", name.c_str());
 
+    // set the hostname
+    hostname = info_.hardware_parameters["hostname"];
+
     // create all of the tracking objects
     for (const auto &sensor : info_.sensors)
     {
       viconObjects[sensor.name] = ViconTrackingObject();
     }
 
-    if (connect("192.168.1.112:801", 200)) {
-      return hardware_interface::CallbackReturn::SUCCESS;
+    return hardware_interface::CallbackReturn::SUCCESS;
+  }
+
+  std::vector<hardware_interface::StateInterface> ViconHardwareInterface::export_state_interfaces()
+  {
+    std::vector<hardware_interface::StateInterface> state_interfaces;
+
+    for (auto it = viconObjects.begin(); it != viconObjects.end(); ++it)
+    {
+      std::string sensorName = it->first;
+      ViconTrackingObject obj = it->second;
+      const FullState &state = obj.GetOutputState();
+
+      state_interfaces.emplace_back(sensorName, "position_x", (double *)&(state.position_x));
+      state_interfaces.emplace_back(sensorName, "position_y", (double *)&(state.position_y));
+      state_interfaces.emplace_back(sensorName, "position_z", (double *)&(state.position_z));
+
+      state_interfaces.emplace_back(sensorName, "velocity_x", (double *)&(state.velocity_x));
+      state_interfaces.emplace_back(sensorName, "velocity_y", (double *)&(state.velocity_y));
+      state_interfaces.emplace_back(sensorName, "velocity_z", (double *)&(state.velocity_z));
+
+      state_interfaces.emplace_back(sensorName, "orientation_qx", (double *)&(state.orientation_qx));
+      state_interfaces.emplace_back(sensorName, "orientation_qy", (double *)&(state.orientation_qy));
+      state_interfaces.emplace_back(sensorName, "orientation_qz", (double *)&(state.orientation_qz));
+      state_interfaces.emplace_back(sensorName, "orientation_qw", (double *)&(state.orientation_qw));
+
+      state_interfaces.emplace_back(sensorName, "omegab_1", (double *)&(state.omegab_1));
+      state_interfaces.emplace_back(sensorName, "omegab_2", (double *)&(state.omegab_2));
+      state_interfaces.emplace_back(sensorName, "omegab_3", (double *)&(state.omegab_3));
     }
 
-    return hardware_interface::CallbackReturn::ERROR;
+    return state_interfaces;
+  }
+
+  hardware_interface::CallbackReturn ViconHardwareInterface::on_activate(const rclcpp_lifecycle::State &)
+  {
+    // Perform any startup tasks
+    if (!connect(hostname, 200))
+    {
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+
+    return hardware_interface::CallbackReturn::SUCCESS;
+  }
+
+  hardware_interface::CallbackReturn ViconHardwareInterface::on_deactivate(const rclcpp_lifecycle::State &)
+  {
+    // Perform any shutdown tasks
+    if (!disconnect())
+    {
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+    return hardware_interface::CallbackReturn::SUCCESS;
+  }
+
+  hardware_interface::return_type ViconHardwareInterface::read(const rclcpp::Time &, const rclcpp::Duration &)
+  {
+    // Read mocap data and update the state variables
+    // This is where you'd fetch data from the Vicon system
+
+    return hardware_interface::return_type::OK;
   }
 
   // Connect to the Vicon system
@@ -63,55 +122,29 @@ namespace vicon_hardware_interface
     return true; // Return true if successful
   }
 
-  std::vector<hardware_interface::StateInterface> ViconHardwareInterface::export_state_interfaces()
+  bool ViconHardwareInterface::disconnect()
   {
-    std::vector<hardware_interface::StateInterface> state_interfaces;
-
-    for (auto it = viconObjects.begin(); it != viconObjects.end(); ++it)
-    {
-      std::string sensorName = it->first;
-      ViconTrackingObject obj = it->second;
-      const FullState &state = obj.GetOutputState();
-
-      state_interfaces.emplace_back(sensorName, "position_x", (double *)&(state.position_x));
-      state_interfaces.emplace_back(sensorName, "position_y", (double *)&(state.position_y));
-      state_interfaces.emplace_back(sensorName, "position_z", (double *)&(state.position_z));
-
-      state_interfaces.emplace_back(sensorName, "velocity_x", (double *)&(state.velocity_x));
-      state_interfaces.emplace_back(sensorName, "velocity_y", (double *)&(state.velocity_y));
-      state_interfaces.emplace_back(sensorName, "velocity_z", (double *)&(state.velocity_z));
-
-      state_interfaces.emplace_back(sensorName, "orientation_qx", (double *)&(state.orientation_qx));
-      state_interfaces.emplace_back(sensorName, "orientation_qy", (double *)&(state.orientation_qy));
-      state_interfaces.emplace_back(sensorName, "orientation_qz", (double *)&(state.orientation_qz));
-      state_interfaces.emplace_back(sensorName, "orientation_qw", (double *)&(state.orientation_qw));
-
-      state_interfaces.emplace_back(sensorName, "omegab_1", (double *)&(state.omegab_1));
-      state_interfaces.emplace_back(sensorName, "omegab_2", (double *)&(state.omegab_2));
-      state_interfaces.emplace_back(sensorName, "omegab_3", (double *)&(state.omegab_3));
+    if (!viconClient.IsConnected().Connected) {
+      return true;
     }
+    sleep(1);
+    viconClient.DisableSegmentData();
+    viconClient.DisableMarkerData();
+    viconClient.DisableUnlabeledMarkerData();
+    viconClient.DisableDeviceData();
+    viconClient.DisableCentroidData();
 
-    return state_interfaces;
-  }
+    std::string msg = "Disconnecting from " + hostname + "...";
+    RCLCPP_INFO(this->get_logger(), msg.c_str());
 
-  hardware_interface::CallbackReturn ViconHardwareInterface::on_activate(const rclcpp_lifecycle::State &)
-  {
-    // Perform any startup tasks
-    return hardware_interface::CallbackReturn::SUCCESS;
-  }
+    viconClient.Disconnect();
+    msg = "Successfully disconnected";
+    RCLCPP_INFO(this->get_logger(), msg.c_str());
 
-  hardware_interface::CallbackReturn ViconHardwareInterface::on_deactivate(const rclcpp_lifecycle::State &)
-  {
-    // Perform any shutdown tasks
-    return hardware_interface::CallbackReturn::SUCCESS;
-  }
-
-  hardware_interface::return_type ViconHardwareInterface::read(const rclcpp::Time &, const rclcpp::Duration &)
-  {
-    // Read mocap data and update the state variables
-    // This is where you'd fetch data from the Vicon system
-
-    return hardware_interface::return_type::OK;
+    if (!viconClient.IsConnected().Connected) {
+      return true;
+    }
+    return false;
   }
 
 } // namespace vicon_hardware_interface

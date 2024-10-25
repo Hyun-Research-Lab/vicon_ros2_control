@@ -34,7 +34,10 @@ namespace vicon_hardware_interface
         std::map<std::string, ViconTrackingObject> viconObjects;
         Client viconClient;
 
+        std::string hostname;
+
         bool connect(std::string hostname, int bufferSize);
+        bool disconnect();
         
     };
 } // namespace vicon_hardware_interface
