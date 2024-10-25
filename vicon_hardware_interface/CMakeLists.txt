@@ -40,10 +40,14 @@ add_library(
   src/vicon_tracking_object.cpp
 )
 
+set(VICON_SDK_DIR ${PROJECT_SOURCE_DIR}/../vicon_sdk)
+include_directories(${VICON_SDK_DIR}/include)
 
-# target_link_libraries(
-#   vicon_hardware_interface PUBLIC serial
-# )
+target_link_libraries(
+  vicon_hardware_interface PUBLIC
+  ${VICON_SDK_DIR}/lib/libViconDataStreamSDK_CPP.so
+)
+
 target_compile_features(vicon_hardware_interface PUBLIC cxx_std_17)
 target_include_directories(vicon_hardware_interface PUBLIC
 $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
@@ -54,12 +58,9 @@ ament_target_dependencies(
   ${THIS_PACKAGE_INCLUDE_DEPENDS}
 )
 
-# Export hardware plugins
-pluginlib_export_plugin_description_file(hardware_interface vicon_hardware_interface.xml)
-
 # INSTALL
 install(
-  DIRECTORY include/
+  DIRECTORY include/ ${VICON_SDK_DIR}/include/
   DESTINATION include
 )
 install(TARGETS vicon_hardware_interface
@@ -68,6 +69,14 @@ install(TARGETS vicon_hardware_interface
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
 )
+
+# Install libraries
+install(DIRECTORY ${VICON_SDK_DIR}/lib/
+    DESTINATION lib
+)
+
+# Export hardware plugins
+pluginlib_export_plugin_description_file(hardware_interface vicon_hardware_interface.xml)
 
 ## EXPORTS
 ament_export_targets(export_vicon_hardware_interface HAS_LIBRARY_TARGET)

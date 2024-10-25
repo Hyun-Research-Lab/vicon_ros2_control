@@ -5,9 +5,12 @@
 #include <hardware_interface/types/hardware_interface_type_values.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include "vicon_hardware_interface/vicon_tracking_object.hpp"
+#include "DataStreamClient.h"
 
 namespace vicon_hardware_interface
 {
+
+    using namespace ViconDataStreamSDK::CPP;
 
     class ViconHardwareInterface : public hardware_interface::SensorInterface
     {
@@ -29,6 +32,9 @@ namespace vicon_hardware_interface
 
     private:
         std::map<std::string, ViconTrackingObject> viconObjects;
+        Client viconClient;
+
+        bool connect(std::string hostname, int bufferSize);
         
     };
 } // namespace vicon_hardware_interface

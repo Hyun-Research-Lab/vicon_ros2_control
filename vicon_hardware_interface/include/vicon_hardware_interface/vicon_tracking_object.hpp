@@ -18,10 +18,9 @@ namespace vicon_hardware_interface
         double orientation_qy;
         double orientation_qz;
         double orientation_qw;
-        double angular_velocity_qx_dot;
-        double angular_velocity_qy_dot;
-        double angular_velocity_qz_dot;
-        double angular_velocity_qw_dot;
+        double omegab_1;
+        double omegab_2;
+        double omegab_3;
     };
 
     struct HalfState {

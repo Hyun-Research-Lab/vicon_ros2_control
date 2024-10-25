@@ -18,10 +18,9 @@ namespace vicon_hardware_interface
         out_fs.orientation_qy = hs.orientation_qy;
         out_fs.orientation_qz = hs.orientation_qz;
         out_fs.orientation_qw = hs.orientation_qw;
-        out_fs.angular_velocity_qx_dot = 0;
-        out_fs.angular_velocity_qy_dot = 0;
-        out_fs.angular_velocity_qz_dot = 0;
-        out_fs.angular_velocity_qw_dot = 0;
+        out_fs.omegab_1 = 0;
+        out_fs.omegab_2 = 0;
+        out_fs.omegab_3 = 0;
     }
 
     void FullStateToPositionVector(const FullState &fs, Vector<3> &out_vec)
@@ -104,11 +103,11 @@ namespace vicon_hardware_interface
         v[2] = (p[2] - y1[2]) / dt;
 
         // do quaternion derivative (this approximation is not the best, but works for small time steps)
-        Vector<4> q_dot;
-        q_dot[0] = (p[3] - y1[3]) / dt;
-        q_dot[1] = (p[4] - y1[4]) / dt;
-        q_dot[2] = (p[5] - y1[5]) / dt;
-        q_dot[3] = (p[6] - y1[6]) / dt;
+        Vector<3> omegab;
+        // q_dot[0] = (p[3] - y1[3]) / dt;
+        // q_dot[1] = (p[4] - y1[4]) / dt;
+        // q_dot[2] = (p[5] - y1[5]) / dt;
+        // q_dot[3] = (p[6] - y1[6]) / dt;
 
 
         // push to raw and filtered data arrays
@@ -124,10 +123,9 @@ namespace vicon_hardware_interface
         fs_filtered.orientation_qy = p[4];
         fs_filtered.orientation_qz = p[5];
         fs_filtered.orientation_qw = p[6];
-        fs_filtered.angular_velocity_qx_dot = q_dot[0];
-        fs_filtered.angular_velocity_qy_dot = q_dot[1];
-        fs_filtered.angular_velocity_qz_dot = q_dot[2];
-        fs_filtered.angular_velocity_qw_dot = q_dot[3];
+        fs_filtered.omegab_1 = omegab[0];
+        fs_filtered.omegab_2 = omegab[1];
+        fs_filtered.omegab_3 = omegab[2];
 
         // push to the buffers
         _PushRaw(fs_raw);
