@@ -6,6 +6,9 @@
 #include <rclcpp/rclcpp.hpp>
 #include "vicon_hardware_interface/vicon_tracking_object.hpp"
 #include "DataStreamClient.h"
+#include <mutex>
+#include <thread>
+#include <atomic>
 
 namespace vicon_hardware_interface
 {
@@ -15,6 +18,15 @@ namespace vicon_hardware_interface
     class ViconHardwareInterface : public hardware_interface::SensorInterface
     {
     public:
+
+        ViconHardwareInterface() : node_(rclcpp::Node::make_shared("vicon_hw_interface_timer")) {}
+
+        ~ViconHardwareInterface()
+        {
+            rclcpp::shutdown();
+            spin_thread_.join();
+        }
+
         // Configure the hardware interface
         hardware_interface::CallbackReturn on_init(const hardware_interface::HardwareInfo &info) override;
 
@@ -31,15 +43,24 @@ namespace vicon_hardware_interface
         hardware_interface::return_type read(const rclcpp::Time &time, const rclcpp::Duration &period) override;
 
     private:
-        std::map<std::string, ViconTrackingObject> viconObjects;
+        ViconTrackingObject viconTrackingObject;
         Client viconClient;
 
+        // this is what is exposed to the controller_manager
+        std::map<std::string, FullState> outputStates;
+        
         std::string hostname;
         int updateRateHz;
 
+        rclcpp::Node::SharedPtr node_;
+        rclcpp::TimerBase::SharedPtr timer_;
+        std::thread spin_thread_;
+        std::mutex mtx;
+
         bool connect(int bufferSize);
         bool disconnect();
-        bool getFrame();
+        bool readViconFrame();
+
         
     };
 } // namespace vicon_hardware_interface

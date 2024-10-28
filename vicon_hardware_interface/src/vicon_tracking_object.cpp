@@ -1,5 +1,6 @@
 #include "vicon_hardware_interface/vicon_tracking_object.hpp"
 #include <stdexcept> // std::runtime_error
+#include <typeinfo>
 
 namespace vicon_hardware_interface
 {
@@ -14,10 +15,10 @@ namespace vicon_hardware_interface
         out_fs.velocity_x = 0;
         out_fs.velocity_y = 0;
         out_fs.velocity_z = 0;
+        out_fs.orientation_qw = hs.orientation_qw;
         out_fs.orientation_qx = hs.orientation_qx;
         out_fs.orientation_qy = hs.orientation_qy;
         out_fs.orientation_qz = hs.orientation_qz;
-        out_fs.orientation_qw = hs.orientation_qw;
         out_fs.omegab_1 = 0;
         out_fs.omegab_2 = 0;
         out_fs.omegab_3 = 0;
@@ -32,171 +33,171 @@ namespace vicon_hardware_interface
 
     void FullStateToQuaternionVector(const FullState &fs, Vector<4> &out_vec)
     {
-        out_vec(0) = fs.orientation_qx;
-        out_vec(1) = fs.orientation_qy;
-        out_vec(2) = fs.orientation_qz;
-        out_vec(3) = fs.orientation_qw;
+        out_vec(0) = fs.orientation_qw;
+        out_vec(1) = fs.orientation_qx;
+        out_vec(2) = fs.orientation_qy;
+        out_vec(3) = fs.orientation_qz;
+    }
+
+    ViconTrackingObjectPrivate::ViconTrackingObjectPrivate()
+    {   
+        // butter(50, 5/(200/2))
+        // A << 0.0000, 0, 0, 0, 0,
+        //     0.2764, -0.4472, -0.5528, 0, 0,
+        //     0.2764, 0.5528, 0.4472, 0, 0,
+        //     0.1056, 0.2111, 0.5528, -0.2361, -0.7639,
+        //     0.1056, 0.2111, 0.5528, 0.7639, 0.2361;
+        // B << 1.4142, 0.3909, 0.3909, 0.1493, 0.1493;
+        // C << 0.0373, 0.0747, 0.1954, 0.2701, 0.4370;
+        // D = 0.0528;
+
+        // butter(5, 5/(200/2))
+        A << 0.8541, 0, 0, 0, 0,
+            0.1287, 0.7644, -0.1389, 0, 0,
+            0.0101, 0.1389, 0.9891, 0, 0,
+            0.0008, 0.0104, 0.1484, 0.8960, -0.1492,
+            0.0001, 0.0008, 0.0117, 0.1492, 0.9883;
+        B << 0.2064,
+            0.0143,
+            0.0011,
+            0.0001,
+            0.0000;
+        C << 0.0000, 0.0003, 0.0041, 0.0528, 0.7030;
+        D = 2.3410e-06;
+
+        X = Eigen::Matrix<double, 5, 6>::Random();
+    }
+
+    // u is the raw data, u = {p_x, p_y, p_z, wtheta_x, wtheta_y, wtheta_z}
+    Vector<6> ViconTrackingObjectPrivate::_DoButterworthFilterUpdate(Vector<6> &u)
+    {
+        Vector<6> Y;
+        for (size_t i = 0; i < 6; i++)
+        {
+            Y(i) = C * X.col(i) + D * u(i);
+            X.col(i) = A * X.col(i) + B * u(i);
+        }
+        return Y; // filtered data, Y = {p_x, p_y, p_z, wtheta_x, wtheta_y, wtheta_z}
     }
 
     // the ViconHardwareInterface gives us some data, we need to use it
     // to update the position/velocity estimates, and save its full state
-    void ViconTrackingObject::PushData(const HalfState &hs)
+    void ViconTrackingObjectPrivate::PushData(const HalfState &hs)
     {
 
         // the first time we are given an object, we will assume that its velocities are zero
         // and we will completely fill the buffer with its position data
-        if (!buffersInitialized)
+        if (!haveReceivedData)
         {
             FullState fs;
             ProjectHalfStateToFullState(hs, fs);
-            for (size_t i = 0; i < VICON_BUFFER_LENGTH; i++)
-            {
-                // push to raw and filtered data
-                _PushRaw(fs);
-                _PushFiltered(fs);
-            }
-            buffersInitialized = true;
+            filteredDataPrevious = fs;
+            haveReceivedData = true;
             return;
         }
 
-        // use an IIR filter to filter the position data
-        FullState fs_raw;
-        ProjectHalfStateToFullState(hs, fs_raw);
+        // obtain wtheta from the quaternion
+        Eigen::Quaternion<double> q_raw(hs.orientation_qw, hs.orientation_qx, hs.orientation_qy, hs.orientation_qz);
+        Eigen::AngleAxis<double> angle_axis_raw(q_raw);
+        Vector<3> omega_theta_raw = angle_axis_raw.axis() * angle_axis_raw.angle();
 
-        // the filtered position vector
-        Vector<3> x0, x1, x2, x3; // raw
-        FullStateToPositionVector(fs_raw, x0);
-        FullStateToPositionVector(_GetRawData(0), x1);
-        FullStateToPositionVector(_GetRawData(1), x2);
-        FullStateToPositionVector(_GetRawData(2), x3);
+        // filter the position and exponential coordiante (w_theta) using butterworth filter
+        Vector<6> u;
+        u << hs.position_x, hs.position_y, hs.position_z, omega_theta_raw(0), omega_theta_raw(1), omega_theta_raw(2);
+        Vector<6> Y = _DoButterworthFilterUpdate(u);
 
-        Vector<3> y1, y2; // filtered
-        FullStateToPositionVector(_GetFilteredData(0), y1);
-        FullStateToPositionVector(_GetFilteredData(1), y2);
+        // bypass butterworth filter
+        // Y = u;
 
-        Vector<3> p;
-        double a0 = 1 / 4.0;
-        double a1 = 1 / 4.0;
-        double a2 = 1 / 4.0;
-        double a3 = 1 / 4.0;
-        double b1 = 0.0;
-        double b2 = 0.0;
-        p = a0 * x0 + a1 * x1 + a2 * x2 + a3 * x3 + b1 * y1 + b2 * y2;
+        FullState fs_filtered;
+        fs_filtered.time = hs.time;
+        fs_filtered.position_x = Y(0);
+        fs_filtered.position_y = Y(1);
+        fs_filtered.position_z = Y(2);
 
-        p = x0;
+        // convert Y(3), Y(4), Y(5) back to quaternion
+        Vector<3> omega_theta_filtered = Y.tail<3>();
+        Eigen::AngleAxis<double> angle_axis_filtered(omega_theta_filtered.norm(), omega_theta_filtered.normalized());
+        Eigen::Quaternion<double> q_filtered(angle_axis_filtered);
 
-        // filtered quaternion vector
-        Vector<4> q;
-        FullStateToQuaternionVector(fs_raw, q);
-        Vector<4> q1, q2;
-        FullStateToQuaternionVector(_GetFilteredData(0), q1);
-        FullStateToQuaternionVector(_GetFilteredData(1), q2);
-
-        // normalize the quaternion when we are done
-        q /= q.norm();
+        fs_filtered.orientation_qw = q_filtered.w();
+        fs_filtered.orientation_qx = q_filtered.x();
+        fs_filtered.orientation_qy = q_filtered.y();
+        fs_filtered.orientation_qz = q_filtered.z();
 
         // calculate the linear velocity using a simple finite difference
-        double dt = fs_raw.time - _GetRawData(0).time;
-        Vector<3> v;
+        double dt = fs_filtered.time - filteredDataPrevious.time;
 
-        if (dt > 0)
+        if (dt > 1e-4)
         {
-            v[0] = (p[0] - y1[0]) / dt;
-            v[1] = (p[1] - y1[1]) / dt;
-            v[2] = (p[2] - y1[2]) / dt;
+            fs_filtered.velocity_x = (fs_filtered.position_x - filteredDataPrevious.position_x) / dt;
+            fs_filtered.velocity_y = (fs_filtered.position_y - filteredDataPrevious.position_y) / dt;
+            fs_filtered.velocity_z = (fs_filtered.position_z - filteredDataPrevious.position_z) / dt;
         }
         else
         {
-            v[0] = 0;
-            v[1] = 0;
-            v[2] = 0;
+            fs_filtered.velocity_x = 0;
+            fs_filtered.velocity_y = 0;
+            fs_filtered.velocity_z = 0;
         }
 
-        // do quaternion derivative (this approximation is not the best, but works for small time steps)
-        Vector<3> omegab;
-        omegab[0] = 0;
-        omegab[1] = 0;
-        omegab[2] = 0;
-        // q_dot[0] = (p[3] - y1[3]) / dt;
-        // q_dot[1] = (p[4] - y1[4]) / dt;
-        // q_dot[2] = (p[5] - y1[5]) / dt;
-        // q_dot[3] = (p[6] - y1[6]) / dt;
+        // calculate the angular velocity from the filtered quaternions
+        // rotation matrix from quaternion
+        Eigen::Quaternion<double> q_prev(filteredDataPrevious.orientation_qw, filteredDataPrevious.orientation_qx, filteredDataPrevious.orientation_qy, filteredDataPrevious.orientation_qz);
+        Matrix<3> R2 = q_filtered.toRotationMatrix();
+        Matrix<3> R1 = q_prev.toRotationMatrix();
 
-        // push to raw and filtered data arrays
-        FullState fs_filtered;
-        fs_filtered.time = fs_raw.time;
-        fs_filtered.position_x = p[0];
-        fs_filtered.position_y = p[1];
-        fs_filtered.position_z = p[2];
-        fs_filtered.velocity_x = v[0];
-        fs_filtered.velocity_y = v[1];
-        fs_filtered.velocity_z = v[2];
-        fs_filtered.orientation_qx = q[0];
-        fs_filtered.orientation_qy = q[1];
-        fs_filtered.orientation_qz = q[2];
-        fs_filtered.orientation_qw = q[3];
-        fs_filtered.omegab_1 = omegab[0];
-        fs_filtered.omegab_2 = omegab[1];
-        fs_filtered.omegab_3 = omegab[2];
+        Matrix<3> R = R1.transpose() * R2;
+        Eigen::AngleAxis<double> omega_theta(R);
+        Vector<3> omega = omega_theta.axis();
+        double theta = omega_theta.angle();
 
-        // push to the buffers
-        _PushRaw(fs_raw);
-        _PushFiltered(fs_filtered);
+        double theta_dot = 0;
+        if (dt > 1e-4)
+        {
+            theta_dot = theta / dt;
+        }
 
-        // update the output state
-        outputState = fs_filtered;
+        Vector<3> omegab_filtered = omega * theta_dot;
+
+        fs_filtered.omegab_1 = omegab_filtered(0);
+        fs_filtered.omegab_2 = omegab_filtered(1);
+        fs_filtered.omegab_3 = omegab_filtered(2);
+
+        // set the latest filtered data
+        filteredDataPrevious = fs_filtered;
     }
 
-    void ViconTrackingObject::_PushRaw(const FullState &fs)
+    bool ViconTrackingObject::AddSensor(const std::string &name)
     {
-        statesRaw[latestRawIndex] = fs;
-        latestRawIndex = (latestRawIndex + 1) % VICON_BUFFER_LENGTH;
+        if (HasSensorWithName(name))
+        {
+            // sensor already exists
+            return false;
+        }
+
+        viconObjects[name] = ViconTrackingObjectPrivate();
+        viconObjectNames.insert(name);
+        return true;
     }
 
-    void ViconTrackingObject::_PushFiltered(const FullState &fs)
+    void ViconTrackingObject::PushData(const std::string &name, const HalfState &hs)
     {
-        statesFiltered[latestFilteredIndex] = fs;
-        latestFilteredIndex = (latestFilteredIndex + 1) % VICON_BUFFER_LENGTH;
+        if (!HasSensorWithName(name))
+        {
+            throw std::runtime_error("Sensor not found: " + name);
+        }
+
+        viconObjects[name].PushData(hs);
     }
 
-    const FullState &ViconTrackingObject::_GetRawData(const size_t previousIndex) const
+    const FullState &ViconTrackingObject::GetLatestState(const std::string &name) const
     {
-        if (previousIndex >= VICON_BUFFER_LENGTH)
+        if (!HasSensorWithName(name))
         {
-            throw std::runtime_error("Index out of bounds. Expected index to be less than buffer length.");
+            throw std::runtime_error("Sensor not found: " + name);
         }
-
-        size_t index;
-        if (latestRawIndex >= previousIndex)
-        {
-            index = latestRawIndex - previousIndex;
-        }
-        else
-        {
-            index = VICON_BUFFER_LENGTH + latestRawIndex - previousIndex;
-        }
-
-        return statesRaw[index];
-    }
-
-    const FullState &ViconTrackingObject::_GetFilteredData(const size_t previousIndex) const
-    {
-        if (previousIndex >= VICON_BUFFER_LENGTH)
-        {
-            throw std::runtime_error("Index out of bounds. Expected index to be less than buffer length.");
-        }
-
-        size_t index;
-        if (latestFilteredIndex >= previousIndex)
-        {
-            index = latestFilteredIndex - previousIndex;
-        }
-        else
-        {
-            index = VICON_BUFFER_LENGTH + latestFilteredIndex - previousIndex;
-        }
-
-        return statesFiltered[index];
+        return viconObjects.at(name).GetLatestState();
     }
 
 }

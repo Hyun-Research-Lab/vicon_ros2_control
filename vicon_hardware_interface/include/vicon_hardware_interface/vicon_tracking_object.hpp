@@ -4,6 +4,9 @@
 #include <array>
 #include <Eigen/Dense> // eigen library
 #include <iostream>
+#include <set>
+#include <map>
+#include <tuple>
 
 namespace vicon_hardware_interface
 {
@@ -37,37 +40,64 @@ namespace vicon_hardware_interface
 
     template <size_t N> 
     using Vector = Eigen::Matrix<double, N, 1>;
+    
+    template <size_t N>
+    using Matrix = Eigen::Matrix<double, N, N>;
 
     void ProjectHalfStateToFullState(const HalfState &hs, FullState &out_fs);
     void FullStateToPositionVector(const FullState &fs, Vector<3> &out_vec);
     void FullStateToQuaternionVector(const FullState &fs, Vector<4> &out_vec);
 
-    class ViconTrackingObject
+    class ViconTrackingObjectPrivate
     {
     public:
-        ViconTrackingObject() {}
-        ~ViconTrackingObject() {}
+        ViconTrackingObjectPrivate();
+        ~ViconTrackingObjectPrivate() {}
 
     private:
-        static constexpr size_t VICON_BUFFER_LENGTH = 5;
-
-        size_t latestRawIndex=0;
-        size_t latestFilteredIndex=0;
-        bool buffersInitialized = false;
-        std::array<FullState, VICON_BUFFER_LENGTH> statesRaw;
-        std::array<FullState, VICON_BUFFER_LENGTH> statesFiltered;
         
-        void _PushRaw(const FullState &fs);
-        void _PushFiltered(const FullState &fs);
+        bool haveReceivedData = false;
+        FullState filteredDataPrevious;
 
-        const FullState& _GetRawData(const size_t previousIndex) const;
-        const FullState& _GetFilteredData(const size_t previousIndex) const;
+        // butterworth filter
+        static constexpr size_t VICON_BUFFER_LENGTH = 5;
+        Matrix<VICON_BUFFER_LENGTH> A;
+        Vector<VICON_BUFFER_LENGTH> B;
+        Eigen::Matrix<double, 1, VICON_BUFFER_LENGTH> C;
+        double D;
+        Eigen::Matrix<double, VICON_BUFFER_LENGTH, 6> X; // state vector
+
+        Vector<6> _DoButterworthFilterUpdate(Vector<6> &u);
 
     public:
-        const FullState & GetOutputState() const { return outputState; }
         void PushData(const HalfState &hs);
-        FullState outputState;
+        const FullState& GetLatestState() const { return filteredDataPrevious; };
     };
+
+    class ViconTrackingObject
+    {
+        public:
+            ViconTrackingObject() {}
+            ~ViconTrackingObject() {}
+
+        private:
+            std::map<std::string, ViconTrackingObjectPrivate> viconObjects;
+            std::set<std::string> viconObjectNames;
+
+        public:
+            bool AddSensor(const std::string &name);
+            void PushData(const std::string &name, const HalfState &hs);
+            const FullState& GetLatestState(const std::string &name) const;
+
+            bool HasSensorWithName(const std::string &name) const {
+                return viconObjectNames.find(name) != viconObjectNames.end();
+            }
+
+            const std::set<std::string>& GetSensorNames() const {
+                return viconObjectNames;
+            }
+    };
+
 } // namespace vicon_hardware_interface
 
 #endif // VICON_TRACKING_OBJECT_HPP_
