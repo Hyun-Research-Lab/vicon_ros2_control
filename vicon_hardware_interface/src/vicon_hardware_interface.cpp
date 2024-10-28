@@ -238,7 +238,7 @@ namespace vicon_hardware_interface
       qy = _Output_GetSegmentGlobalRotationQuaternion.Rotation[1];
       qz = _Output_GetSegmentGlobalRotationQuaternion.Rotation[2];
 
-      RCLCPP_INFO(this->get_logger(), "Subject: %s, Segment: %s, Position: (%f, %f, %f), Orientation: (%f, %f, %f, %f)", SubjectName.c_str(), SegmentName.c_str(), x, y, z, qx, qy, qz, qw);
+      // RCLCPP_INFO(this->get_logger(), "Subject: %s, Segment: %s, Position: (%f, %f, %f), Orientation: (%f, %f, %f, %f)", SubjectName.c_str(), SegmentName.c_str(), x, y, z, qx, qy, qz, qw);
 
       // Get the current time point from the system clock
       auto now = std::chrono::system_clock::now();
