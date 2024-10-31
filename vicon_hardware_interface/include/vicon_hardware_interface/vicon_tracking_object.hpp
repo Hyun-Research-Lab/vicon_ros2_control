@@ -12,30 +12,56 @@ namespace vicon_hardware_interface
 {
     struct FullState {
         double time;
-        double position_x;
-        double position_y;
-        double position_z;
-        double velocity_x;
-        double velocity_y;
-        double velocity_z;
-        double orientation_qx;
-        double orientation_qy;
-        double orientation_qz;
-        double orientation_qw;
-        double omegab_1;
-        double omegab_2;
-        double omegab_3;
+        // position p = (px,py,pz)
+        double px;
+        double py;
+        double pz;
+
+        // velocity v = (vx,vy,vz)
+        double vx;
+        double vy;
+        double vz;
+
+        // quaternion q= w + xi + yj + zk
+        double qx;
+        double qy;
+        double qz;
+        double qw;
+
+        // angular velocity in body frame
+        // wb = (wb1, wb2, wb3)
+        double wb1;
+        double wb2;
+        double wb3;
+
+        // temp for logging
+        
+
+        double qContinuous_w;
+        double qContinuous_x;
+        double qContinuous_y;
+        double qContinuous_z;
+
+        double theta;
+        double eigen1;
+        double eigen2;
+        double eigen3;
+
+        double qaxis1;
+        double qaxis2;
+        double qaxis3;
+
     };
 
     struct HalfState {
         double time;
-        double position_x;
-        double position_y;
-        double position_z;
-        double orientation_qx;
-        double orientation_qy;
-        double orientation_qz;
-        double orientation_qw;
+        double px;
+        double py;
+        double pz;
+        double qx;
+        double qy;
+        double qz;
+        double qw;
     };
 
     template <size_t N> 
@@ -56,22 +82,27 @@ namespace vicon_hardware_interface
 
     private:
         
-        bool haveReceivedData = false;
-        FullState filteredDataPrevious;
+        bool haveNeverReceivedValidData = true;
+        FullState fsPrev;
+
+        bool lastDataWasInvalid = false;
+        HalfState hsPrev;
+        double thetaPrev;
 
         // butterworth filter
-        static constexpr size_t VICON_BUFFER_LENGTH = 5;
-        Matrix<VICON_BUFFER_LENGTH> A;
-        Vector<VICON_BUFFER_LENGTH> B;
-        Eigen::Matrix<double, 1, VICON_BUFFER_LENGTH> C;
+        // static constexpr size_t BUTTERWORTH_FILTER_STATES = 10;
+        static constexpr size_t BUTTERWORTH_FILTER_STATES = 5;
+        Matrix<BUTTERWORTH_FILTER_STATES> A;
+        Vector<BUTTERWORTH_FILTER_STATES> B;
+        Eigen::Matrix<double, 1, BUTTERWORTH_FILTER_STATES> C;
         double D;
-        Eigen::Matrix<double, VICON_BUFFER_LENGTH, 6> X; // state vector
+        Eigen::Matrix<double, BUTTERWORTH_FILTER_STATES, 6> X; // state vector
 
         Vector<6> _DoButterworthFilterUpdate(Vector<6> &u);
 
     public:
-        void PushData(const HalfState &hs);
-        const FullState& GetLatestState() const { return filteredDataPrevious; };
+        bool PushData(const HalfState &hs);
+        const FullState& GetLatestState() const { return fsPrev; };
     };
 
     class ViconTrackingObject
@@ -86,7 +117,7 @@ namespace vicon_hardware_interface
 
         public:
             bool AddSensor(const std::string &name);
-            void PushData(const std::string &name, const HalfState &hs);
+            bool PushData(const std::string &name, const HalfState &hs);
             const FullState& GetLatestState(const std::string &name) const;
 
             bool HasSensorWithName(const std::string &name) const {

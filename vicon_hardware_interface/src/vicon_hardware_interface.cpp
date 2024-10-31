@@ -3,9 +3,20 @@
 #include <rclcpp/rclcpp.hpp>
 #include <chrono>
 #include <ctime>
+#include <fstream>
+#include <iostream>
+#include <iomanip>
 
 namespace vicon_hardware_interface
 {
+
+  ViconHardwareInterface::~ViconHardwareInterface()
+  {
+    on_deactivate(rclcpp_lifecycle::State());
+    rclcpp::shutdown();
+    spin_thread_.join();
+  }
+
   hardware_interface::CallbackReturn ViconHardwareInterface::on_init(const hardware_interface::HardwareInfo &info)
   {
     if (SensorInterface::on_init(info) != hardware_interface::CallbackReturn::SUCCESS)
@@ -24,10 +35,12 @@ namespace vicon_hardware_interface
     // create all of the tracking objects
     for (const auto &sensor : info_.sensors)
     {
-      if (viconTrackingObject.AddSensor(sensor.name)) {
+      if (viconTrackingObject.AddSensor(sensor.name))
+      {
         outputStates[sensor.name] = FullState();
       }
-      else {
+      else
+      {
         RCLCPP_ERROR(this->get_logger(), "Sensor %s already exists", sensor.name.c_str());
         return hardware_interface::CallbackReturn::ERROR;
       }
@@ -45,22 +58,22 @@ namespace vicon_hardware_interface
     RCLCPP_INFO(this->get_logger(), "Exporting state interfaces...");
     for (auto name : viconTrackingObject.GetSensorNames())
     {
-      state_interfaces.emplace_back(name, "position_x", (double *)&(outputStates[name].position_x));
-      state_interfaces.emplace_back(name, "position_y", (double *)&(outputStates[name].position_y));
-      state_interfaces.emplace_back(name, "position_z", (double *)&(outputStates[name].position_z));
+      state_interfaces.emplace_back(name, "position_x", (double *)&(outputStates[name].px));
+      state_interfaces.emplace_back(name, "position_y", (double *)&(outputStates[name].py));
+      state_interfaces.emplace_back(name, "position_z", (double *)&(outputStates[name].pz));
 
-      state_interfaces.emplace_back(name, "velocity_x", (double *)&(outputStates[name].velocity_x));
-      state_interfaces.emplace_back(name, "velocity_y", (double *)&(outputStates[name].velocity_y));
-      state_interfaces.emplace_back(name, "velocity_z", (double *)&(outputStates[name].velocity_z));
+      state_interfaces.emplace_back(name, "velocity_x", (double *)&(outputStates[name].vx));
+      state_interfaces.emplace_back(name, "velocity_y", (double *)&(outputStates[name].vy));
+      state_interfaces.emplace_back(name, "velocity_z", (double *)&(outputStates[name].vz));
 
-      state_interfaces.emplace_back(name, "orientation_qw", (double *)&(outputStates[name].orientation_qw));
-      state_interfaces.emplace_back(name, "orientation_qx", (double *)&(outputStates[name].orientation_qx));
-      state_interfaces.emplace_back(name, "orientation_qy", (double *)&(outputStates[name].orientation_qy));
-      state_interfaces.emplace_back(name, "orientation_qz", (double *)&(outputStates[name].orientation_qz));
+      state_interfaces.emplace_back(name, "orientation_qw", (double *)&(outputStates[name].qw));
+      state_interfaces.emplace_back(name, "orientation_qx", (double *)&(outputStates[name].qx));
+      state_interfaces.emplace_back(name, "orientation_qy", (double *)&(outputStates[name].qy));
+      state_interfaces.emplace_back(name, "orientation_qz", (double *)&(outputStates[name].qz));
 
-      state_interfaces.emplace_back(name, "omegab_1", (double *)&(outputStates[name].omegab_1));
-      state_interfaces.emplace_back(name, "omegab_2", (double *)&(outputStates[name].omegab_2));
-      state_interfaces.emplace_back(name, "omegab_3", (double *)&(outputStates[name].omegab_3));
+      state_interfaces.emplace_back(name, "omegab_1", (double *)&(outputStates[name].wb1));
+      state_interfaces.emplace_back(name, "omegab_2", (double *)&(outputStates[name].wb2));
+      state_interfaces.emplace_back(name, "omegab_3", (double *)&(outputStates[name].wb3));
     }
     RCLCPP_INFO(this->get_logger(), "Exported %zu state interfaces", state_interfaces.size());
 
@@ -76,18 +89,78 @@ namespace vicon_hardware_interface
     }
 
     timer_ = node_->create_wall_timer(
-      std::chrono::microseconds(static_cast<int>(1e6 / updateRateHz)),
-      std::bind(&ViconHardwareInterface::readViconFrame, this));
+        std::chrono::microseconds(static_cast<int>(1e6 / updateRateHz)),
+        std::bind(&ViconHardwareInterface::readViconFrame, this));
 
-    spin_thread_ = std::thread([this]() {
-      rclcpp::spin(node_);
-    });
+    spin_thread_ = std::thread([this]()
+                               { rclcpp::spin(node_); });
 
     return hardware_interface::CallbackReturn::SUCCESS;
   }
 
   hardware_interface::CallbackReturn ViconHardwareInterface::on_deactivate(const rclcpp_lifecycle::State &)
   {
+
+    // take all of the saved data and put it into a CSV file
+    // log data to CSV
+    auto now = std::chrono::system_clock::now();
+    std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
+    std::ostringstream oss;
+    oss << std::put_time(std::localtime(&currentTime), "%Y-%m-%d-%H:%M:%S");
+    std::string currentTimeStr = oss.str();
+    std::string filename = "vicon_data" + currentTimeStr + ".csv";
+    std::ofstream outFile(filename);
+    outFile << "time,raw_px,raw_py,raw_pz,raw_qw,raw_qx,raw_qy,raw_qz,";
+    outFile << "updated_qx,updated_qy,updated_qz,updated_qw,";
+    outFile << "px,py,pz,vx,vy,vz,qw,qx,qy,qz,wb1,wb2,wb3,";
+    outFile << "theta,eigen1,eigen2,eigen3,qaxis1,qaxis2,qaxis3,";
+    outFile << "qContinuous_w,qContinuous_x,qContinuous_y,qContinuous_z";
+    outFile << std::endl;
+    for (const auto &data : log)
+    {
+      outFile << std::setprecision(15) << data.hs_raw.time << ","
+              << std::setprecision(9) << data.hs_raw.px << ","
+              << data.hs_raw.py << ","
+              << data.hs_raw.pz << ","
+              << data.hs_raw.qw << ","
+              << data.hs_raw.qx << ","
+              << data.hs_raw.qy << ","
+              << data.hs_raw.qz << ","
+              << data.hs_updated.qw << ","
+              << data.hs_updated.qx << ","
+              << data.hs_updated.qy << ","
+              << data.hs_updated.qz << ","
+              << data.fs.px << ","
+              << data.fs.py << ","
+              << data.fs.pz << ","
+              << data.fs.vx << ","
+              << data.fs.vy << ","
+              << data.fs.vz << ","
+              << data.fs.qw << ","
+              << data.fs.qx << ","
+              << data.fs.qy << ","
+              << data.fs.qz << ","
+              << data.fs.wb1 << ","
+              << data.fs.wb2 << ","
+              << data.fs.wb3 << ","
+              // for debugging
+              << data.fs.theta << ","
+              << data.fs.eigen1 << ","
+              << data.fs.eigen2 << ","
+              << data.fs.eigen3 << ","
+              << data.fs.qaxis1 << ","
+              << data.fs.qaxis2 << ","
+              << data.fs.qaxis3 << ","
+              << data.fs.qContinuous_w << ","
+              << data.fs.qContinuous_x << ","
+              << data.fs.qContinuous_y << ","
+              << data.fs.qContinuous_z << std::endl;
+
+      // std::endl;
+    }
+    outFile.close();
+    std::cout << "Data saved to saved_data.csv" << std::endl;
+
     // Perform any shutdown tasks
     if (!disconnect())
     {
@@ -99,15 +172,12 @@ namespace vicon_hardware_interface
   hardware_interface::return_type ViconHardwareInterface::read(const rclcpp::Time &, const rclcpp::Duration &)
   {
     // Read mocap data and update the state variables
-    // This is where you'd fetch data from the Vicon system
-    // RCLCPP_INFO(this->get_logger(), "Reading data from Vicon system...");
+
     for (const std::string &sensorName : viconTrackingObject.GetSensorNames())
     {
       outputStates[sensorName] = viconTrackingObject.GetLatestState(sensorName);
     }
 
-    // getFrame();
-    // RCLCPP_INFO(this->get_logger(), "Data read successfully.");
     return hardware_interface::return_type::OK;
   }
 
@@ -250,18 +320,30 @@ namespace vicon_hardware_interface
       double seconds_since_epoch = std::chrono::duration<double>(duration).count();
 
       HalfState hs;
-      hs.time = seconds_since_epoch; // Assuming this is the correct way to get time
-      hs.position_x = x;
-      hs.position_y = y;
-      hs.position_z = z;
-      hs.orientation_qw = qw;
-      hs.orientation_qx = qx;
-      hs.orientation_qy = qy;
-      hs.orientation_qz = qz;
+      hs.time = seconds_since_epoch;
+      hs.px = x;
+      hs.py = y;
+      hs.pz = z;
+      hs.qw = qw;
+      hs.qx = qx;
+      hs.qy = qy;
+      hs.qz = qz;
 
       // Push the data into the buffer for the corresponding object
       // This will handle filtering and data storage for us
-      viconTrackingObject.PushData(SubjectName, hs);
+      if (!viconTrackingObject.PushData(SubjectName, hs))
+      {
+        RCLCPP_INFO(get_logger(), "failed to push data successfully\n");
+        continue;
+      }
+
+      if (log.size() < 100000) // Limit the number of saved data points
+      {
+        LoggingStruct logData;
+        logData.fs = viconTrackingObject.GetLatestState(SubjectName);
+        logData.hs_raw = hs;
+        log.push_back(logData);
+      }
     }
     return true;
   }

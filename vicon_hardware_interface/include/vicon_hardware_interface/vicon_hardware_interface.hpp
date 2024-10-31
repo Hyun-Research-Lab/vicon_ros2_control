@@ -9,11 +9,19 @@
 #include <mutex>
 #include <thread>
 #include <atomic>
+#include <vector>
+#include <string>
 
 namespace vicon_hardware_interface
 {
 
     using namespace ViconDataStreamSDK::CPP;
+
+    struct LoggingStruct {
+        HalfState hs_raw;
+        HalfState hs_updated;
+        FullState fs;
+    };
 
     class ViconHardwareInterface : public hardware_interface::SensorInterface
     {
@@ -21,11 +29,7 @@ namespace vicon_hardware_interface
 
         ViconHardwareInterface() : node_(rclcpp::Node::make_shared("vicon_hw_interface_timer")) {}
 
-        ~ViconHardwareInterface()
-        {
-            rclcpp::shutdown();
-            spin_thread_.join();
-        }
+        ~ViconHardwareInterface();
 
         // Configure the hardware interface
         hardware_interface::CallbackReturn on_init(const hardware_interface::HardwareInfo &info) override;
@@ -60,6 +64,9 @@ namespace vicon_hardware_interface
         bool connect(int bufferSize);
         bool disconnect();
         bool readViconFrame();
+
+        // for testing only
+        std::vector<LoggingStruct> log;
 
         
     };
