@@ -32,6 +32,8 @@ namespace vicon_hardware_interface
     hostname = info_.hardware_parameters["hostname"];
     updateRateHz = std::stoi(info_.hardware_parameters["update_rate_hz"]);
 
+    RCLCPP_INFO(get_logger(), "updateRateHz: %d", updateRateHz);
+
     // create all of the tracking objects
     for (const auto &sensor : info_.sensors)
     {
@@ -111,10 +113,7 @@ namespace vicon_hardware_interface
     std::string filename = "vicon_data" + currentTimeStr + ".csv";
     std::ofstream outFile(filename);
     outFile << "time,raw_px,raw_py,raw_pz,raw_qw,raw_qx,raw_qy,raw_qz,";
-    outFile << "updated_qx,updated_qy,updated_qz,updated_qw,";
-    outFile << "px,py,pz,vx,vy,vz,qw,qx,qy,qz,wb1,wb2,wb3,";
-    outFile << "theta,eigen1,eigen2,eigen3,qaxis1,qaxis2,qaxis3,";
-    outFile << "qContinuous_w,qContinuous_x,qContinuous_y,qContinuous_z";
+    outFile << "px,py,pz,vx,vy,vz,qw,qx,qy,qz,wb1,wb2,wb3";
     outFile << std::endl;
     for (const auto &data : log)
     {
@@ -126,10 +125,6 @@ namespace vicon_hardware_interface
               << data.hs_raw.qx << ","
               << data.hs_raw.qy << ","
               << data.hs_raw.qz << ","
-              << data.hs_updated.qw << ","
-              << data.hs_updated.qx << ","
-              << data.hs_updated.qy << ","
-              << data.hs_updated.qz << ","
               << data.fs.px << ","
               << data.fs.py << ","
               << data.fs.pz << ","
@@ -142,21 +137,7 @@ namespace vicon_hardware_interface
               << data.fs.qz << ","
               << data.fs.wb1 << ","
               << data.fs.wb2 << ","
-              << data.fs.wb3 << ","
-              // for debugging
-              << data.fs.theta << ","
-              << data.fs.eigen1 << ","
-              << data.fs.eigen2 << ","
-              << data.fs.eigen3 << ","
-              << data.fs.qaxis1 << ","
-              << data.fs.qaxis2 << ","
-              << data.fs.qaxis3 << ","
-              << data.fs.qContinuous_w << ","
-              << data.fs.qContinuous_x << ","
-              << data.fs.qContinuous_y << ","
-              << data.fs.qContinuous_z << std::endl;
-
-      // std::endl;
+              << data.fs.wb3 << std::endl;
     }
     outFile.close();
     std::cout << "Data saved to saved_data.csv" << std::endl;

@@ -32,6 +32,10 @@ endforeach()
 
 include_directories(${EIGEN3_INCLUDE_DIR})
 
+# modern robotics
+set(MODERN_ROBOTICS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../ModernRoboticsCpp)
+include_directories(${MODERN_ROBOTICS_DIR}/include)
+
 ##COMPILE
 add_library(
   vicon_hardware_interface
@@ -46,6 +50,11 @@ include_directories(${VICON_SDK_DIR}/include)
 target_link_libraries(
   vicon_hardware_interface PUBLIC
   ${VICON_SDK_DIR}/lib/libViconDataStreamSDK_CPP.so
+)
+# modern robotics
+target_link_libraries(
+  vicon_hardware_interface PUBLIC
+  ${MODERN_ROBOTICS_DIR}/build/libModernRoboticsCpp.so
 )
 
 target_compile_features(vicon_hardware_interface PUBLIC cxx_std_17)
@@ -63,11 +72,18 @@ install(
   DIRECTORY include/ ${VICON_SDK_DIR}/include/
   DESTINATION include
 )
+install(
+  DIRECTORY include/ ${MODERN_ROBOTICS_DIR}/include/
+  DESTINATION include
+)
 install(TARGETS vicon_hardware_interface
   EXPORT export_vicon_hardware_interface
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
+)
+install(FILES ${MODERN_ROBOTICS_DIR}/build/libModernRoboticsCpp.so
+  DESTINATION lib
 )
 
 # Install libraries

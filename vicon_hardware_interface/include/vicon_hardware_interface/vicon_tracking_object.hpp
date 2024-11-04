@@ -33,24 +33,6 @@ namespace vicon_hardware_interface
         double wb1;
         double wb2;
         double wb3;
-
-        // temp for logging
-        
-
-        double qContinuous_w;
-        double qContinuous_x;
-        double qContinuous_y;
-        double qContinuous_z;
-
-        double theta;
-        double eigen1;
-        double eigen2;
-        double eigen3;
-
-        double qaxis1;
-        double qaxis2;
-        double qaxis3;
-
     };
 
     struct HalfState {
@@ -86,19 +68,46 @@ namespace vicon_hardware_interface
         FullState fsPrev;
 
         bool lastDataWasInvalid = false;
-        HalfState hsPrev;
-        double thetaPrev;
 
         // butterworth filter
-        // static constexpr size_t BUTTERWORTH_FILTER_STATES = 10;
-        static constexpr size_t BUTTERWORTH_FILTER_STATES = 5;
-        Matrix<BUTTERWORTH_FILTER_STATES> A;
-        Vector<BUTTERWORTH_FILTER_STATES> B;
-        Eigen::Matrix<double, 1, BUTTERWORTH_FILTER_STATES> C;
-        double D;
-        Eigen::Matrix<double, BUTTERWORTH_FILTER_STATES, 6> X; // state vector
+        static constexpr size_t BUTTER_STATES = 10;
+        // static constexpr size_t BUTTER_STATES = 5;
+        Matrix<BUTTER_STATES> A_butter;
+        Vector<BUTTER_STATES> B_butter;
+        Eigen::Matrix<double, 1, BUTTER_STATES> C_butter;
+        double D_butter;
+        Eigen::Matrix<double, BUTTER_STATES, 3> X_butter; // state vector
 
-        Vector<6> _DoButterworthFilterUpdate(Vector<6> &u);
+        Vector<3> _DoButterworthFilterUpdate(Vector<3> &u);
+
+        // Savitzky-Golay filter
+        static constexpr size_t SGOLAY_WINDOW_SIZE = 20;
+        // static constexpr size_t SGOLAY_POLYNOMIAL_ORDER = 2; // currently 2 is implemented
+        static constexpr double SGOLAY_DT = 1.0 / 200.0;
+        Eigen::Matrix<double, 9, 3*(SGOLAY_WINDOW_SIZE+1)> A_sgolay;
+        Eigen::Vector<double, 3*(SGOLAY_WINDOW_SIZE+1)> b_sgolay;
+        std::array<Eigen::Matrix3d, SGOLAY_WINDOW_SIZE> R_history;
+
+        // create circular buffer
+        bool hasFullRBuffer = false;
+        size_t sgolay_index = 0;
+        void _PushCircularBuffer(const Eigen::Matrix3d &R) {
+            R_history[sgolay_index] = R;
+            sgolay_index = (sgolay_index + 1) % SGOLAY_WINDOW_SIZE;
+            
+            // if we have filled the buffer, then the index will wrap around to zero
+            if (sgolay_index == 0) {
+                hasFullRBuffer = true;
+            }
+        }
+        // index = 0 is the oldest, index = 1 is second oldest, etc.
+        const Eigen::Matrix3d & _GetR(const size_t index) const {
+            return R_history[(sgolay_index + index) % SGOLAY_WINDOW_SIZE];
+        }
+        
+        // filter methods
+        Eigen::Matrix3d _dexpSO3(const Eigen::Vector3d &a) const;
+        std::tuple<Eigen::Matrix3d, Eigen::Vector3d> _filterSO3(const Eigen::Matrix3d &R);
 
     public:
         bool PushData(const HalfState &hs);

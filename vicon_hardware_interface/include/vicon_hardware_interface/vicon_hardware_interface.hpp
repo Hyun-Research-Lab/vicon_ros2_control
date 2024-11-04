@@ -19,7 +19,6 @@ namespace vicon_hardware_interface
 
     struct LoggingStruct {
         HalfState hs_raw;
-        HalfState hs_updated;
         FullState fs;
     };
 
