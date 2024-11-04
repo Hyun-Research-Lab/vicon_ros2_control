@@ -23,10 +23,10 @@ namespace vicon_hardware_interface
         double vz;
 
         // quaternion q= w + xi + yj + zk
+        double qw;
         double qx;
         double qy;
         double qz;
-        double qw;
 
         // angular velocity in body frame
         // wb = (wb1, wb2, wb3)
@@ -89,7 +89,7 @@ namespace vicon_hardware_interface
         Vector<3> _DoButterworthFilterVel(Vector<3> &u);
 
         // Savitzky-Golay filter
-        static constexpr size_t SGOLAY_WINDOW_SIZE = 20;
+        static constexpr size_t SGOLAY_WINDOW_SIZE = 40;
         // static constexpr size_t SGOLAY_POLYNOMIAL_ORDER = 2; // currently 2 is implemented
         static constexpr double SGOLAY_DT = 1.0 / 200.0;
         Eigen::Matrix<double, 9, 3*(SGOLAY_WINDOW_SIZE+1)> A_sgolay;

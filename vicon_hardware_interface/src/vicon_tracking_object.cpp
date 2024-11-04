@@ -203,6 +203,7 @@ namespace vicon_hardware_interface
 
         if (phi < 1e-6)
         {
+            // i don't think this case should ever happen
             res = Eigen::Matrix3d::Identity() + 0.5 * a_hat;
         }
         else
@@ -271,13 +272,18 @@ namespace vicon_hardware_interface
         // filter the position/velocity using butterworth filter
         Vector<3> u;
         u << hs.px, hs.py, hs.pz;
-        Vector<3> Y = _DoButterworthFilterPos(u);
+        Vector<3> Y; // = _DoButterworthFilterPos(u);
 
-        // record the filtered position data
+        // // record the filtered position data
+        // fs.time = hs.time;
+        // fs.px = Y(0);
+        // fs.py = Y(1);
+        // fs.pz = Y(2);
+
         fs.time = hs.time;
-        fs.px = Y(0);
-        fs.py = Y(1);
-        fs.pz = Y(2);
+        fs.px = u(0);
+        fs.py = u(1);
+        fs.pz = u(2);
 
         // do butterworth filter for velocity, too
         double dt = hs.time - fsPrev.time;
