@@ -70,15 +70,23 @@ namespace vicon_hardware_interface
         bool lastDataWasInvalid = false;
 
         // butterworth filter
-        static constexpr size_t BUTTER_STATES = 10;
+        static constexpr size_t BUTTER_STATES_POS = 10;
         // static constexpr size_t BUTTER_STATES = 5;
-        Matrix<BUTTER_STATES> A_butter;
-        Vector<BUTTER_STATES> B_butter;
-        Eigen::Matrix<double, 1, BUTTER_STATES> C_butter;
-        double D_butter;
-        Eigen::Matrix<double, BUTTER_STATES, 3> X_butter; // state vector
+        Matrix<BUTTER_STATES_POS> Apos_butter;
+        Vector<BUTTER_STATES_POS> Bpos_butter;
+        Eigen::Matrix<double, 1, BUTTER_STATES_POS> Cpos_butter;
+        double Dpos_butter;
+        Eigen::Matrix<double, BUTTER_STATES_POS, 3> Xpos_butter; // state vector
 
-        Vector<3> _DoButterworthFilterUpdate(Vector<3> &u);
+        static constexpr size_t BUTTER_STATES_VEL = 10;
+        Matrix<BUTTER_STATES_VEL> Avel_butter;
+        Vector<BUTTER_STATES_VEL> Bvel_butter;
+        Eigen::Matrix<double, 1, BUTTER_STATES_VEL> Cvel_butter;
+        double Dvel_butter;
+        Eigen::Matrix<double, BUTTER_STATES_VEL, 3> Xvel_butter; // state vector
+
+        Vector<3> _DoButterworthFilterPos(Vector<3> &u);
+        Vector<3> _DoButterworthFilterVel(Vector<3> &u);
 
         // Savitzky-Golay filter
         static constexpr size_t SGOLAY_WINDOW_SIZE = 20;

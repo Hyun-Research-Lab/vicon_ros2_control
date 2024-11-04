@@ -84,7 +84,7 @@ namespace vicon_hardware_interface
         // 20 Hz Butterworth filter with 10 states
         // [A, B, C, D] = butter(10, 20/(200/2))
 
-        A_butter << 0.1446, -0.3719, 0, 0, 0, 0, 0, 0, 0, 0,
+        Apos_butter << 0.1446, -0.3719, 0, 0, 0, 0, 0, 0, 0, 0,
             0.3719, 0.8792, 0, 0, 0, 0, 0, 0, 0, 0,
             0.0717, 0.3625, 0.1872, -0.3858, 0, 0, 0, 0, 0, 0,
             0.0233, 0.1178, 0.3858, 0.8747, 0, 0, 0, 0, 0, 0,
@@ -94,8 +94,7 @@ namespace vicon_hardware_interface
             0.0001, 0.0006, 0.0020, 0.0095, 0.0313, 0.1406, 0.4640, 0.8492, 0, 0,
             0.0000, 0.0002, 0.0005, 0.0026, 0.0084, 0.0378, 0.1249, 0.4977, 0.6567, -0.5383,
             0.0000, 0.0001, 0.0002, 0.0008, 0.0027, 0.0123, 0.0406, 0.1617, 0.5383, 0.8251;
-
-        B_butter << 0.5259,
+        Bpos_butter << 0.5259,
             0.1709,
             0.0330,
             0.0107,
@@ -105,11 +104,33 @@ namespace vicon_hardware_interface
             0.0001,
             0.0000,
             0.0000;
+        Cpos_butter << 0.0000, 0.0000, 0.0001, 0.0003, 0.0010, 0.0043, 0.0143, 0.0572, 0.1903, 0.6453;
+        Dpos_butter = 1.6836e-06;
+        Xpos_butter = Eigen::Matrix<double, BUTTER_STATES_POS, 3>::Zero();
 
-        C_butter << 0.0000, 0.0000, 0.0001, 0.0003, 0.0010, 0.0043, 0.0143, 0.0572, 0.1903, 0.6453;
-        D_butter = 1.6836e-06;
-
-        X_butter = Eigen::Matrix<double, BUTTER_STATES, 3>::Zero();
+        Avel_butter << 0.1446, -0.3719, 0, 0, 0, 0, 0, 0, 0, 0,
+            0.3719, 0.8792, 0, 0, 0, 0, 0, 0, 0, 0,
+            0.0717, 0.3625, 0.1872, -0.3858, 0, 0, 0, 0, 0, 0,
+            0.0233, 0.1178, 0.3858, 0.8747, 0, 0, 0, 0, 0, 0,
+            0.0048, 0.0244, 0.0801, 0.3892, 0.2779, -0.4152, 0, 0, 0, 0,
+            0.0016, 0.0079, 0.0260, 0.1265, 0.4152, 0.8651, 0, 0, 0, 0,
+            0.0004, 0.0018, 0.0060, 0.0293, 0.0963, 0.4327, 0.4280, -0.4640, 0, 0,
+            0.0001, 0.0006, 0.0020, 0.0095, 0.0313, 0.1406, 0.4640, 0.8492, 0, 0,
+            0.0000, 0.0002, 0.0005, 0.0026, 0.0084, 0.0378, 0.1249, 0.4977, 0.6567, -0.5383,
+            0.0000, 0.0001, 0.0002, 0.0008, 0.0027, 0.0123, 0.0406, 0.1617, 0.5383, 0.8251;
+        Bvel_butter << 0.5259,
+            0.1709,
+            0.0330,
+            0.0107,
+            0.0022,
+            0.0007,
+            0.0002,
+            0.0001,
+            0.0000,
+            0.0000;
+        Cvel_butter << 0.0000, 0.0000, 0.0001, 0.0003, 0.0010, 0.0043, 0.0143, 0.0572, 0.1903, 0.6453;
+        Dvel_butter = 1.6836e-06;
+        Xvel_butter = Eigen::Matrix<double, BUTTER_STATES_VEL, 3>::Zero();
 
         /* Savitzky-Golay Filter */
         Eigen::Matrix<double, 3 * (SGOLAY_WINDOW_SIZE + 1), 9> Ak;
@@ -146,15 +167,26 @@ namespace vicon_hardware_interface
     }
 
     // u is the raw data, u = {p_x, p_y, p_z}
-    Vector<3> ViconTrackingObjectPrivate::_DoButterworthFilterUpdate(Vector<3> &u)
+    Vector<3> ViconTrackingObjectPrivate::_DoButterworthFilterPos(Vector<3> &u)
     {
         Vector<3> Y;
         for (size_t i = 0; i < 3; i++)
         {
-            Y(i) = C_butter * X_butter.col(i) + D_butter * u(i);
-            X_butter.col(i) = A_butter * X_butter.col(i) + B_butter * u(i);
+            Y(i) = Cvel_butter * Xpos_butter.col(i) + Dvel_butter * u(i);
+            Xpos_butter.col(i) = Avel_butter * Xpos_butter.col(i) + Bvel_butter * u(i);
         }
         return Y; // filtered data, Y = {p_x, p_y, p_z}
+    }
+
+    Vector<3> ViconTrackingObjectPrivate::_DoButterworthFilterVel(Vector<3> &u)
+    {
+        Vector<3> Y;
+        for (size_t i = 0; i < 3; i++)
+        {
+            Y(i) = Cvel_butter * Xvel_butter.col(i) + Dvel_butter * u(i);
+            Xvel_butter.col(i) = Avel_butter * Xvel_butter.col(i) + Bvel_butter * u(i);
+        }
+        return Y;
     }
 
     // compute the right trivialized tangent d exp on SO(3)
@@ -239,7 +271,7 @@ namespace vicon_hardware_interface
         // filter the position/velocity using butterworth filter
         Vector<3> u;
         u << hs.px, hs.py, hs.pz;
-        Vector<3> Y = _DoButterworthFilterUpdate(u);
+        Vector<3> Y = _DoButterworthFilterPos(u);
 
         // record the filtered position data
         fs.time = hs.time;
@@ -247,26 +279,30 @@ namespace vicon_hardware_interface
         fs.py = Y(1);
         fs.pz = Y(2);
 
-        // calculate the velocity
+        // do butterworth filter for velocity, too
         double dt = hs.time - fsPrev.time;
         if (dt > 0)
         {
-            fs.vx = (fs.px - fsPrev.px) / dt;
-            fs.vy = (fs.py - fsPrev.py) / dt;
-            fs.vz = (fs.pz - fsPrev.pz) / dt;
+            u << (fs.px - fsPrev.px) / dt, (fs.py - fsPrev.py) / dt, (fs.pz - fsPrev.pz) / dt;
         }
         else
         {
-            fs.vx = fsPrev.vx;
-            fs.vy = fsPrev.vy;
-            fs.vz = fsPrev.vz;
+            u << fsPrev.vx, fsPrev.vy, fsPrev.vz;
         }
+        Y = _DoButterworthFilterVel(u);
+        fs.vx = Y(0);
+        fs.vy = Y(1);
+        fs.vz = Y(2);
 
-        // now, smooth out the velocity
-        // this is done by taking the average of the current and previous velocity
-        fs.vx = 0.5 * (fs.vx + fsPrev.vx);
-        fs.vy = 0.5 * (fs.vy + fsPrev.vy);
-        fs.vz = 0.5 * (fs.vz + fsPrev.vz);
+        // fs.vx = u(0);
+        // fs.vy = u(1);
+        // fs.vz = u(2);
+
+        // // now, smooth out the velocity
+        // // this is done by taking the average of the current and previous velocity
+        // fs.vx = 0.5 * (fs.vx + fsPrev.vx);
+        // fs.vy = 0.5 * (fs.vy + fsPrev.vy);
+        // fs.vz = 0.5 * (fs.vz + fsPrev.vz);
 
         // get quaternion
         Eigen::Quaterniond q_raw(hs.qw, hs.qx, hs.qy, hs.qz);
@@ -279,8 +315,8 @@ namespace vicon_hardware_interface
             // this will run once we have a full buffer
             auto [R_est, w_est] = _filterSO3(R_raw);
 
-            auto wb = w_est;
-            // auto wb = R_est.transpose() * w_est; // w_est is in the {s} frame, R_est is {s -> b} frame
+            // auto wb = w_est;
+            auto wb = R_est.transpose() * w_est; // w_est is in the {s} frame, R_est is {s -> b} frame
             // convert R to quaternion
             Eigen::Quaterniond q_est(R_est);
 
