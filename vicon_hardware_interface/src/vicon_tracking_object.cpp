@@ -42,95 +42,40 @@ namespace vicon_hardware_interface
 
     ViconTrackingObjectPrivate::ViconTrackingObjectPrivate()
     {
-        // butter(5, 50/(200/2)) (50 Hz)
-        // A << 0.0000, 0, 0, 0, 0,
-        //     0.2764, -0.4472, -0.5528, 0, 0,
-        //     0.2764, 0.5528, 0.4472, 0, 0,
-        //     0.1056, 0.2111, 0.5528, -0.2361, -0.7639,
-        //     0.1056, 0.2111, 0.5528, 0.7639, 0.2361;
-        // B << 1.4142, 0.3909, 0.3909, 0.1493, 0.1493;
-        // C << 0.0373, 0.0747, 0.1954, 0.2701, 0.4370;
-        // D = 0.0528;
+        /* Butterworth Filters */
+        // copy sand paste from CreateButterworth.m
+        Apos_butter << 8.710534e-01, -8.823664e-02,
+            8.823664e-02, 9.958389e-01;
+        Bpos_butter << 1.247855e-01,
+            5.884733e-03;
+        Cpos_butter << 3.119636e-02, 7.056356e-01;
+        Dpos_butter = 2.080567e-03;
 
-        // butter(5, 5/(200/2)) (5 Hz)
-        // A_butter << 0.8541, 0, 0, 0, 0,
-        //     0.1287, 0.7644, -0.1389, 0, 0,
-        //     0.0101, 0.1389, 0.9891, 0, 0,
-        //     0.0008, 0.0104, 0.1484, 0.8960, -0.1492,
-        //     0.0001, 0.0008, 0.0117, 0.1492, 0.9883;
-        // B_butter << 0.2064,
-        //     0.0143,
-        //     0.0011,
-        //     0.0001,
-        //     0.0000;
-        // C_butter << 0.0000, 0.0003, 0.0041, 0.0528, 0.7030;
-        // D_butter = 2.3410e-06;
+        Avel_butter << 9.099300e-01, 0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00,
+            8.351194e-02, 8.543784e-01, -8.745027e-02, 0.000000e+00, 0.000000e+00,
+            3.938323e-03, 8.745027e-02, 9.958760e-01, 0.000000e+00, 0.000000e+00,
+            1.800776e-04, 3.998615e-03, 9.126031e-02, 9.391689e-01, -9.144888e-02,
+            8.492246e-06, 1.885699e-04, 4.303727e-03, 9.144888e-02, 9.956874e-01;
+        Bvel_butter << 1.273782e-01,
+            5.569630e-03,
+            2.626571e-04,
+            1.200985e-05,
+            5.663701e-07;
+        Cvel_butter << 3.002462e-06, 6.666952e-05, 1.521597e-03, 3.233206e-02, 7.055820e-01;
+        Dvel_butter = 2.002421e-07;
 
-        // 20 Hz Butterworth filter with 5 states
-        // [A, B, C, D] = butter(5, 20/(200/2))
-        // A << 0.5095, 0, 0, 0, 0,
-        //     0.3007, 0.2260, -0.3984, 0, 0,
-        //     0.0977, 0.3984, 0.8706, 0, 0,
-        //     0.0243, 0.0991, 0.4652, 0.5309, -0.4974,
-        //     0.0079, 0.0322, 0.1512, 0.4974, 0.8384;
-        // B << 0.6936,
-        //     0.1382,
-        //     0.0449,
-        //     0.0112,
-        //     0.0036;
-        // C << 0.0028, 0.0114, 0.0534, 0.1759, 0.6500;
-        // D = 0.0013;
-
-        // 20 Hz Butterworth filter with 10 states
-        // [A, B, C, D] = butter(10, 20/(200/2))
-
-        Apos_butter << 0.1446, -0.3719, 0, 0, 0, 0, 0, 0, 0, 0,
-            0.3719, 0.8792, 0, 0, 0, 0, 0, 0, 0, 0,
-            0.0717, 0.3625, 0.1872, -0.3858, 0, 0, 0, 0, 0, 0,
-            0.0233, 0.1178, 0.3858, 0.8747, 0, 0, 0, 0, 0, 0,
-            0.0048, 0.0244, 0.0801, 0.3892, 0.2779, -0.4152, 0, 0, 0, 0,
-            0.0016, 0.0079, 0.0260, 0.1265, 0.4152, 0.8651, 0, 0, 0, 0,
-            0.0004, 0.0018, 0.0060, 0.0293, 0.0963, 0.4327, 0.4280, -0.4640, 0, 0,
-            0.0001, 0.0006, 0.0020, 0.0095, 0.0313, 0.1406, 0.4640, 0.8492, 0, 0,
-            0.0000, 0.0002, 0.0005, 0.0026, 0.0084, 0.0378, 0.1249, 0.4977, 0.6567, -0.5383,
-            0.0000, 0.0001, 0.0002, 0.0008, 0.0027, 0.0123, 0.0406, 0.1617, 0.5383, 0.8251;
-        Bpos_butter << 0.5259,
-            0.1709,
-            0.0330,
-            0.0107,
-            0.0022,
-            0.0007,
-            0.0002,
-            0.0001,
-            0.0000,
-            0.0000;
-        Cpos_butter << 0.0000, 0.0000, 0.0001, 0.0003, 0.0010, 0.0043, 0.0143, 0.0572, 0.1903, 0.6453;
-        Dpos_butter = 1.6836e-06;
-        Xpos_butter = Eigen::Matrix<double, BUTTER_STATES_POS, 3>::Zero();
-
-        Avel_butter << 0.1446, -0.3719, 0, 0, 0, 0, 0, 0, 0, 0,
-            0.3719, 0.8792, 0, 0, 0, 0, 0, 0, 0, 0,
-            0.0717, 0.3625, 0.1872, -0.3858, 0, 0, 0, 0, 0, 0,
-            0.0233, 0.1178, 0.3858, 0.8747, 0, 0, 0, 0, 0, 0,
-            0.0048, 0.0244, 0.0801, 0.3892, 0.2779, -0.4152, 0, 0, 0, 0,
-            0.0016, 0.0079, 0.0260, 0.1265, 0.4152, 0.8651, 0, 0, 0, 0,
-            0.0004, 0.0018, 0.0060, 0.0293, 0.0963, 0.4327, 0.4280, -0.4640, 0, 0,
-            0.0001, 0.0006, 0.0020, 0.0095, 0.0313, 0.1406, 0.4640, 0.8492, 0, 0,
-            0.0000, 0.0002, 0.0005, 0.0026, 0.0084, 0.0378, 0.1249, 0.4977, 0.6567, -0.5383,
-            0.0000, 0.0001, 0.0002, 0.0008, 0.0027, 0.0123, 0.0406, 0.1617, 0.5383, 0.8251;
-        Bvel_butter << 0.5259,
-            0.1709,
-            0.0330,
-            0.0107,
-            0.0022,
-            0.0007,
-            0.0002,
-            0.0001,
-            0.0000,
-            0.0000;
-        Cvel_butter << 0.0000, 0.0000, 0.0001, 0.0003, 0.0010, 0.0043, 0.0143, 0.0572, 0.1903, 0.6453;
-        Dvel_butter = 1.6836e-06;
-        Xvel_butter = Eigen::Matrix<double, BUTTER_STATES_VEL, 3>::Zero();
+        Aw_butter << 9.099300e-01, 0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00,
+            8.351194e-02, 8.543784e-01, -8.745027e-02, 0.000000e+00, 0.000000e+00,
+            3.938323e-03, 8.745027e-02, 9.958760e-01, 0.000000e+00, 0.000000e+00,
+            1.800776e-04, 3.998615e-03, 9.126031e-02, 9.391689e-01, -9.144888e-02,
+            8.492246e-06, 1.885699e-04, 4.303727e-03, 9.144888e-02, 9.956874e-01;
+        Bw_butter << 1.273782e-01,
+            5.569630e-03,
+            2.626571e-04,
+            1.200985e-05,
+            5.663701e-07;
+        Cw_butter << 3.002462e-06, 6.666952e-05, 1.521597e-03, 3.233206e-02, 7.055820e-01;
+        Dw_butter = 2.002421e-07;
 
         /* Savitzky-Golay Filter */
         Eigen::Matrix<double, 3 * (SGOLAY_WINDOW_SIZE + 1), 9> Ak;
@@ -172,8 +117,8 @@ namespace vicon_hardware_interface
         Vector<3> Y;
         for (size_t i = 0; i < 3; i++)
         {
-            Y(i) = Cvel_butter * Xpos_butter.col(i) + Dvel_butter * u(i);
-            Xpos_butter.col(i) = Avel_butter * Xpos_butter.col(i) + Bvel_butter * u(i);
+            Y(i) = Cpos_butter * Xpos_butter.col(i) + Dpos_butter * u(i);
+            Xpos_butter.col(i) = Apos_butter * Xpos_butter.col(i) + Bpos_butter * u(i);
         }
         return Y; // filtered data, Y = {p_x, p_y, p_z}
     }
@@ -185,6 +130,17 @@ namespace vicon_hardware_interface
         {
             Y(i) = Cvel_butter * Xvel_butter.col(i) + Dvel_butter * u(i);
             Xvel_butter.col(i) = Avel_butter * Xvel_butter.col(i) + Bvel_butter * u(i);
+        }
+        return Y;
+    }
+
+    Vector<3> ViconTrackingObjectPrivate::_DoButterworthFilterW(Vector<3> &u)
+    {
+        Vector<3> Y;
+        for (size_t i = 0; i < 3; i++)
+        {
+            Y(i) = Cw_butter * Xw_butter.col(i) + Dw_butter * u(i);
+            Xw_butter.col(i) = Aw_butter * Xw_butter.col(i) + Bw_butter * u(i);
         }
         return Y;
     }
@@ -228,7 +184,7 @@ namespace vicon_hardware_interface
         // solve the least squares problem
         // but since (Ak^T Ak)^-1 Ak^T is already calculated, we simply have
         const Eigen::Vector<double, 9> rho = A_sgolay * b_sgolay;
-        const Eigen::Vector3d rho0 = rho.head(3);
+        const Eigen::Vector3d rho0 = rho(Eigen::seq(0, 2));
         const Eigen::Vector3d rho1 = rho(Eigen::seq(3, 5));
 
         // calculate rotation matrix
@@ -272,18 +228,19 @@ namespace vicon_hardware_interface
         // filter the position/velocity using butterworth filter
         Vector<3> u;
         u << hs.px, hs.py, hs.pz;
-        Vector<3> Y; // = _DoButterworthFilterPos(u);
+        Vector<3> Y = _DoButterworthFilterPos(u);
 
-        // // record the filtered position data
-        // fs.time = hs.time;
-        // fs.px = Y(0);
-        // fs.py = Y(1);
-        // fs.pz = Y(2);
-
+        // record the filtered position data
         fs.time = hs.time;
-        fs.px = u(0);
-        fs.py = u(1);
-        fs.pz = u(2);
+
+        fs.px = Y(0);
+        fs.py = Y(1);
+        fs.pz = Y(2);
+
+        // uncomment to use raw position data
+        // fs.px = u(0);
+        // fs.py = u(1);
+        // fs.pz = u(2);
 
         // do butterworth filter for velocity, too
         double dt = hs.time - fsPrev.time;
@@ -300,38 +257,36 @@ namespace vicon_hardware_interface
         fs.vy = Y(1);
         fs.vz = Y(2);
 
+        // uncomment to use raw velocity data
         // fs.vx = u(0);
         // fs.vy = u(1);
         // fs.vz = u(2);
 
-        // // now, smooth out the velocity
-        // // this is done by taking the average of the current and previous velocity
-        // fs.vx = 0.5 * (fs.vx + fsPrev.vx);
-        // fs.vy = 0.5 * (fs.vy + fsPrev.vy);
-        // fs.vz = 0.5 * (fs.vz + fsPrev.vz);
 
+        /* filter quaternion */
         // get quaternion
         Eigen::Quaterniond q_raw(hs.qw, hs.qx, hs.qy, hs.qz);
 
         // convert to rotation matrix
+
         Eigen::Matrix3d R_raw = q_raw.toRotationMatrix();
 
         if (hasFullRBuffer)
         {
             // this will run once we have a full buffer
             auto [R_est, w_est] = _filterSO3(R_raw);
-
-            // auto wb = w_est;
-            auto wb = R_est.transpose() * w_est; // w_est is in the {s} frame, R_est is {s -> b} frame
-            // convert R to quaternion
             Eigen::Quaterniond q_est(R_est);
 
-            // verify that the quaternion is pointing in the same direction as the previous quaternion
-            // this is to prevent the quaternion from flipping
+            // // auto wb = w_est;
+            // auto wb = R_est.transpose() * w_est; // w_est is in the {s} frame, R_est is {s -> b} frame
+            // // convert R to quaternion
+
+            // // verify that the quaternion is pointing in the same direction as the previous quaternion
+            // // this is to prevent the quaternion from flipping
             Eigen::Quaterniond q_prev(fsPrev.qw, fsPrev.qx, fsPrev.qy, fsPrev.qz);
 
-            // for now, use the same quaternion as the raw data
-            if (q_est.vec().dot(q_raw.vec()) < -0.5)
+            // // for now, use the same quaternion as the raw data
+            if (q_est.vec().dot(q_prev.vec()) < -0.5)
             {
                 q_est = Eigen::Quaterniond(-q_est.w(), -q_est.x(), -q_est.y(), -q_est.z());
             }
@@ -342,10 +297,45 @@ namespace vicon_hardware_interface
             fs.qy = q_est.y();
             fs.qz = q_est.z();
 
-            fs.wb1 = wb(0);
-            fs.wb2 = wb(1);
-            fs.wb3 = wb(2);
+            // uncomment to use the Savitzky-Golay filter for angular velocity (not recommended)
+            // fs.wb1 = wb(0);
+            // fs.wb2 = wb(1);
+            // fs.wb3 = wb(2);
         }
+
+        // uncomment to use raw orientation
+        // fs.qw = q_raw.w();
+        // fs.qx = q_raw.x();
+        // fs.qy = q_raw.y();
+        // fs.qz = q_raw.z();
+        
+        /* filter angular velocity */
+
+        // use first order difference to get omega
+        Eigen::Quaterniond q_prev(fsPrev.qw, fsPrev.qx, fsPrev.qy, fsPrev.qz);
+        Eigen::Quaterniond q_now(fs.qw, fs.qx, fs.qy, fs.qz);
+        Eigen::Matrix3d R1 = q_prev.toRotationMatrix();
+        Eigen::Matrix3d R2 = q_now.toRotationMatrix();
+
+        Eigen::Vector3d w;
+        if (dt > 1e-6)
+        {
+            w = mr::so3ToVec(mr::MatrixLog3(R1.transpose() * R2) / dt);
+        }
+        else
+        {
+            w = Eigen::Vector3d::Zero();
+        }
+
+        Y = _DoButterworthFilterW(w);
+        fs.wb1 = Y(0);
+        fs.wb2 = Y(1);
+        fs.wb3 = Y(2);
+
+        // uncomment to use raw angular velocity
+        // fs.wb1 = w(0);
+        // fs.wb2 = w(1);
+        // fs.wb3 = w(2);
 
         // set the latest filtered data
         fsPrev = fs;
